@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -7,22 +7,104 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+interface Message {
+  id: number;
+  sender: string;
+  text: string;
+  time: string;
+  isMine: boolean;
+}
+
+interface Chat {
+  id: number;
+  name: string;
+  lastMessage: string;
+  time: string;
+  unread: number;
+  avatar: string;
+  status: string;
+}
+
 const Index = () => {
   const [activeTab, setActiveTab] = useState('chats');
   const [selectedChat, setSelectedChat] = useState<number | null>(null);
+  const [messageInput, setMessageInput] = useState('');
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [chatMessages, setChatMessages] = useState<{ [key: number]: Message[] }>({});
 
-  const mockChats = [
-    { id: 1, name: 'Александр Волков', lastMessage: 'Отличная идея! Встречаемся завтра', time: '14:23', unread: 2, avatar: '🐺', status: 'online' },
-    { id: 2, name: 'Дизайн команда', lastMessage: 'Марина: Прототип готов', time: '13:45', unread: 5, avatar: '🎨', status: 'online' },
-    { id: 3, name: 'Екатерина Смирнова', lastMessage: 'Фото: природа.jpg', time: '12:10', unread: 0, avatar: '🌸', status: 'away' },
-    { id: 4, name: 'Проект WOLF', lastMessage: 'Иван: Всем привет!', time: '11:30', unread: 12, avatar: '🚀', status: 'online' },
-  ];
+  useEffect(() => {
+    const savedChats = localStorage.getItem('wolf_chats');
+    const savedMessages = localStorage.getItem('wolf_messages');
+    
+    if (savedChats) {
+      setChats(JSON.parse(savedChats));
+    } else {
+      const initialChats = [
+        { id: 1, name: 'Александр Волков', lastMessage: 'Отличная идея! Встречаемся завтра', time: '14:23', unread: 2, avatar: '🐺', status: 'online' },
+        { id: 2, name: 'Дизайн команда', lastMessage: 'Марина: Прототип готов', time: '13:45', unread: 5, avatar: '🎨', status: 'online' },
+        { id: 3, name: 'Екатерина Смирнова', lastMessage: 'Фото: природа.jpg', time: '12:10', unread: 0, avatar: '🌸', status: 'away' },
+        { id: 4, name: 'Проект WOLF', lastMessage: 'Иван: Всем привет!', time: '11:30', unread: 12, avatar: '🚀', status: 'online' },
+      ];
+      setChats(initialChats);
+      localStorage.setItem('wolf_chats', JSON.stringify(initialChats));
+    }
 
-  const mockMessages = [
-    { id: 1, sender: 'Александр Волков', text: 'Привет! Как дела с проектом?', time: '14:15', isMine: false },
-    { id: 2, sender: 'Я', text: 'Всё отлично! Завершаю последние детали', time: '14:18', isMine: true },
-    { id: 3, sender: 'Александр Волков', text: 'Отличная идея! Встречаемся завтра', time: '14:23', isMine: false },
-  ];
+    if (savedMessages) {
+      setChatMessages(JSON.parse(savedMessages));
+    } else {
+      const initialMessages = {
+        1: [
+          { id: 1, sender: 'Александр Волков', text: 'Привет! Как дела с проектом?', time: '14:15', isMine: false },
+          { id: 2, sender: 'Я', text: 'Всё отлично! Завершаю последние детали', time: '14:18', isMine: true },
+          { id: 3, sender: 'Александр Волков', text: 'Отличная идея! Встречаемся завтра', time: '14:23', isMine: false },
+        ]
+      };
+      setChatMessages(initialMessages);
+      localStorage.setItem('wolf_messages', JSON.stringify(initialMessages));
+    }
+  }, []);
+
+  const sendMessage = () => {
+    if (!messageInput.trim() || !selectedChat) return;
+
+    const now = new Date();
+    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    const newMessage: Message = {
+      id: Date.now(),
+      sender: 'Я',
+      text: messageInput,
+      time: timeString,
+      isMine: true
+    };
+
+    const updatedMessages = {
+      ...chatMessages,
+      [selectedChat]: [...(chatMessages[selectedChat] || []), newMessage]
+    };
+    
+    setChatMessages(updatedMessages);
+    localStorage.setItem('wolf_messages', JSON.stringify(updatedMessages));
+
+    const updatedChats = chats.map(chat => 
+      chat.id === selectedChat 
+        ? { ...chat, lastMessage: messageInput, time: timeString, unread: 0 }
+        : chat
+    );
+    setChats(updatedChats);
+    localStorage.setItem('wolf_chats', JSON.stringify(updatedChats));
+
+    setMessageInput('');
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const currentMessages = selectedChat ? (chatMessages[selectedChat] || []) : [];
 
   const mockGroups = [
     { id: 1, name: 'Проект WOLF', members: 47, avatar: '🚀', lastActivity: '5 мин назад' },
@@ -133,7 +215,7 @@ const Index = () => {
         <ScrollArea className="flex-1">
           {activeTab === 'chats' && (
             <div className="p-2">
-              {mockChats.map((chat) => (
+              {chats.map((chat) => (
                 <button
                   key={chat.id}
                   onClick={() => setSelectedChat(chat.id)}
@@ -287,7 +369,7 @@ const Index = () => {
 
             <ScrollArea className="flex-1 p-6">
               <div className="space-y-4 max-w-4xl mx-auto">
-                {mockMessages.map((message) => (
+                {currentMessages.map((message) => (
                   <div
                     key={message.id}
                     className={`flex ${message.isMine ? 'justify-end' : 'justify-start'}`}
@@ -323,8 +405,16 @@ const Index = () => {
                 <Input 
                   placeholder="Написать сообщение..." 
                   className="flex-1 bg-muted border-border rounded-xl"
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={handleKeyPress}
                 />
-                <Button size="icon" className="rounded-xl gold-gradient text-black">
+                <Button 
+                  size="icon" 
+                  className="rounded-xl gold-gradient text-black"
+                  onClick={sendMessage}
+                  disabled={!messageInput.trim()}
+                >
                   <Icon name="Send" size={20} />
                 </Button>
               </div>
